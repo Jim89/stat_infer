@@ -1,0 +1,497 @@
+---
+output: html_document
+---
+# Statistical Inference 
+### Course Project - Assignment 2
+### Jim Leach
+
+********************************************************************************
+
+### Synopsis
+
+This report has been created for the the *Statistical Inference* MOOC from Johns Hopkins university on [Coursera](https://class.coursera.org/statinference-005).
+
+The second assignment required analysis of the ToothGrowth data set in R. Specifically, the following points had to be addressed:
+
+1. Load the ToothGrowth data and perform some basic exploratory data analyses 
+2. Provide a basic summary of the data.
+3. Use confidence intervals and hypothesis tests to compare tooth growth by supp and dose.
+4. State your conclusions and the assumptions needed for your conclusions. 
+
+See Appendix 1 for the complete, end-to-end R code that generates all the required output.
+
+********************************************************************************
+
+### Data Processing:
+```{r packages, echo = FALSE,results = 'hide',message = FALSE}
+# i. ggplot2
+library(ggplot2,quietly=T)
+
+# ii. magrittr
+library(magrittr,quietly=T)
+
+# iii. dplyr
+library(dplyr,quietly=T)
+```
+
+#### Loading and Summarising ToothGrowth Data
+```{r set_parameters, echo = FALSE, results = 'hide', message = FALSE}
+# 1i. load the dataset
+data(ToothGrowth)
+
+# 1ii. read in to R
+data <- ToothGrowth
+```
+
+The ToothGrowth data set in R is a small data set detailing the length of odontoblats (teeth) in each of 10 guinea pigs given a dose of Vitamin C in one of three doses (0.5, 1 and 2 mg) and via one of two delivery methods (orange juice or pure ascorbic acid)
+
+The structure of this data is:
+```{r str_data, echo=FALSE}
+str(data)
+```
+Looking at this output, this analysis has coded the values of the `supp` variable as follows:
+ 
+* OJ - Orange Juice
+* VC - Ascorbic Acid
+
+##### Summarising Data
+Given that the `supp` and `dose` variables are values used by the study and not recorded data, it is sufficient to look only at the summary of the `len` data (i.e the tooth length):
+```{r summary, echo=FALSE}
+summary(data$len)
+sd_len <- sd(data$len)
+lower <- mean(data$len) - qt(0.975, 59) * sd_len/sqrt(60)
+upper <- mean(data$len) + qt(0.975, 59) * sd_len/sqrt(60)
+```
+
+Additionally, it is calculated that the standard deviation of the tooth length is `r I(sd_len)`. The 95% confidence interval of the mean ranges from `r round(lower,1)` to `r round(upper,1)`.
+
+#### Exploring the Data
+##### Summarising By supplement
+Next, a brief summary is performed by supplement:
+```{r supp_summary, echo=FALSE}
+data_sum_sup <- data %>%
+                group_by(supp) %>%
+                summarise(mean_growth = mean(len),
+                          sd_growth = sd(len),
+                          lower_95 = mean_growth - qt(0.975, 29) * 
+                                                      (sd_growth/sqrt(30)),
+                          upper_95 = mean_growth + qt(0.975, 29) * 
+                                                      (sd_growth/sqrt(30)),
+                          ci = upper_95 - mean_growth)
+                          
+data_sum_sup$supp <- ifelse(data_sum_sup$supp == "OJ", "Orange Juice",
+                                                       "Ascorbic Acid")
+data_sum_sup[,1:5]
+```
+ 
+The data presented show the mean growth with orange juice (`r round(data_sum_sup[1,2],2)`) and with pure ascorbic acid (`r round(data_sum_sup[2,2],2)`) as well as the standard deviation and the 95% confidence intervals for these values.
+
+##### Figure 1 - Mean tooth length by supplement:
+```{r fig1_mean_length_supp, echo=FALSE}
+data_sum_sup %>%
+ggplot(aes(x = supp, y = mean_growth), colour = supp)+
+  geom_bar(stat = "identity", aes(fill = supp))+
+  geom_errorbar(aes(ymin=mean_growth-ci, ymax=mean_growth+ci),
+                width=.2,                    # Width of the error bars
+                position=position_dodge(.9))+
+  scale_fill_manual(values = c("darkorange4", "darkorange"))+
+  theme_minimal()+
+  theme(legend.position = "none")+
+  ylab("Mean tooth length")+
+  xlab("")
+```
+
+It appears that orange juice results in a larger tooth length than pure ascorbic acid. This is tested below.
+
+##### Summarising By Dose
+A brief summary is performed by dose:
+```{r dose_summary, echo=FALSE}
+data_sum_dose <- data %>%
+  group_by(dose) %>%
+  summarise(mean_growth = mean(len),
+            sd_growth = sd(len),
+            lower_95 = mean_growth - qt(0.975, 19) * 
+              (sd_growth/sqrt(30)),
+            upper_95 = mean_growth + qt(0.975, 19) * 
+              (sd_growth/sqrt(30)),
+            ci = upper_95 - mean_growth)
+
+data_sum_dose[,1:5]
+```
+The data presented show the mean growth for doses of 2.0mg (`r round(data_sum_dose[1,2],2)`), 1.0mg (`r round(data_sum_dose[2,2],2)`) and 0.5mg (`r round(data_sum_dose[3,2],2)`) as well as the standard deviation and the 95% confidence intervals for these values.
+
+##### Figure 2 - Mean tooth length by dose:
+```{r fig2_mean_len_dose, echo=FALSE}
+data_sum_dose %>%
+ggplot(aes(x = as.character(dose), y = mean_growth), colour = dose)+
+  geom_bar(stat = "identity", aes(fill = as.character(dose)))+
+  geom_errorbar(aes(ymin=mean_growth-ci, ymax=mean_growth+ci),
+                width=.2,                    # Width of the error bars
+                position=position_dodge(.9))+
+  scale_fill_manual(values = c("gray34","gray22","gray10"))+
+  xlab("Dosage (mg)")+
+  ylab("Mean tooth length")+
+  theme_minimal()+
+  theme(legend.position = "none")
+```
+
+It appears that a higher dose results in a larger tooth length than pure ascorbic acid. This is tested below.
+
+##### Summarising By supplement *and* Dose
+A brief summary is performed by supplement *and* dose:
+```{r both_summary, echo=FALSE}
+data_sum_both <- data %>%
+  group_by(supp, dose) %>%
+  summarise(mean_growth = mean(len),
+            sd_growth = sd(len),
+            lower_95 = mean_growth - qt(0.975, 9) * 
+              (sd_growth/sqrt(30)),
+            upper_95 = mean_growth + qt(0.975, 9) * 
+              (sd_growth/sqrt(30)),
+            ci = upper_95 - mean_growth)
+
+data_sum_both$supp <- ifelse(data_sum_both$supp == "OJ", "Orange Juice",
+                                                         "Ascorbic Acid")
+
+data_sum_both[,1:5]
+```
+The data presented show the mean growth for doses of 2.0mg, 1.0mg and 0.5mg of the respective supplements as well as the standard deviation and the 95% confidence intervals for these values.
+
+##### Figure 3 - Mean tooth length by supplement and dose:
+```{r fig3_mean_len_both, echo=FALSE}
+data_sum_both %>%
+  ggplot(aes(x = as.character(dose), y = mean_growth), colour = dose)+
+  geom_bar(stat = "identity", aes(fill = as.character(dose)))+
+  geom_errorbar(aes(ymin=mean_growth-ci, ymax=mean_growth+ci),
+                width=.2,                    # Width of the error bars
+                position=position_dodge(.9))+
+  facet_grid(.~supp)+
+  scale_fill_manual(values = c("gray34","gray22","gray10"))+
+  xlab("Dosage (mg)")+
+  ylab("Mean tooth length")+
+  theme_minimal()+
+  theme(legend.position = "none")
+```
+
+It is interesting to note that whilst orange juice appears to result in a larger mean growth at low and medium does (0.5 and 1.0mg), at a higher dosage of 2.0mg it appears that the two supplements are roughly equivalent. 
+
+This is tested below.
+
+*******************************************************************************
+
+### Hypothesis Testing:
+
+Broadly speaking, the exploration of the data has presented two main hypotheses:
+
+1. Orange juice supplementation produces a higher mean tooth growth than ascorbic acid; and
+2. A higher dosage of either supplement produces a higher mean tooth growth.
+
+#### Testing Based on supplement
+The Student's $t$-test output for the comparison of tooth growth with orange juice compared to ascorbic acid is:
+```{r oj_vc_test, echo=FALSE}
+oj <- data %>% filter(supp == "OJ") %>% select(len)
+vc <- data %>% filter(supp == "VC") %>% select(len)
+
+result <- t.test(oj, vc, alternative = "greater", paired = FALSE, var.equal = TRUE)
+result
+```
+
+With a $p$-value of `r round(result$p.value,3)` and a $t$-confidence interval of `r result$conf[1]` to `r result$conf[2]` (i.e. not containing 0) it seems reasonable to reject the null hypothesis, and so the data show that orange juice produces a higher mean tooth growth than ascorbic acid.
+
+#### Testing Based on Dose
+##### Comparing 2.0mg with 0.5mg
+The Student's $t$-test output for the comparison of tooth growth with a dose of 2.0mg compared to 0.5mg is:
+```{r dose_test, echo=FALSE}
+# lets test that with a t.test:
+# hypothesis - higher doses provides a higher growth
+dose2 <- data %>% filter(dose == 2.0) %>% select(len)
+dose1 <- data %>% filter(dose == 1.0) %>% select(len)
+dose0.5 <- data %>% filter(dose == 0.5) %>% select(len)
+
+# perform test for 2 being greater than 0.5
+two_half <- t.test(dose2, dose0.5, alternative = "greater", paired = F, var.equal = T)
+
+# perform test for 2 being greater than 1
+two_one <- t.test(dose2, dose1, atlernative = "greater", paired = F, var.equal = T)
+
+# perform test for 1 being greater than 0.5
+one_half <- t.test(dose1, dose0.5, alternative = "greater", paired = F, var.equal = T)
+
+two_half
+```
+With a $p$-value of `r I(two_half$p.value)` and a $t$-confidence interval of `r two_half$conf[1]` to `r two_half$conf[2]` (i.e. not containing 0) it seems reasonable to reject the null hypothesis, and so the data show that 2.0mg of supplement produces a higher mean tooth growth than 0.5mg of supplement.
+
+##### Comparing 2.0mg with 1.0mg
+Similarly, the Student's $t$-test output for the comparison of tooth growth with a dose of 2.0mg compared to 1.0mg is:
+```{r two_one_test, echo=FALSE}
+two_one
+```
+With a $p$-value of `r I(two_one$p.value)` and a $t$-confidence interval of `r two_one$conf[1]` to `r two_one$conf[2]` (i.e. not containing 0) it seems reasonable to reject the null hypothesis, and so the data show that 2.0mg of supplement also produces a higher mean tooth growth than 1.0mg of supplement.
+
+##### Comparing 1.0mg with 0.5mg
+Finally, the Student's $t$-test output for the comparison of tooth growth with a dose of 1.0mg compared to 0.5mg is:
+```{r one_half_test, echo=FALSE}
+one_half
+```
+With a $p$-value of `r I(one_half$p.value)` and a $t$-confidence interval of `r one_half$conf[1]` to `r one_half$conf[2]` (i.e. not containing 0) it seems reasonable to reject the null hypothesis, and so the data show that 2.0mg of supplement also produces a higher mean tooth growth than 1.0mg of supplement.
+
+
+#### Testing Based on supplement *and* Dose
+The previous results show that orange juice produces a higher mean growth than ascorbic acid; and similarly a higher dosage produces a higher mean growth. 
+
+Whether these results can be cross-validated, i.e. does orange juice provide a higher growth rate at *all* doses (recall from the exploratory analysis that this only seemed to be the case at low and mediaum doses) is shown below:
+
+##### Comparing Orange Juice to Ascorbic Acid at 0.5mg
+The Student's $t$-test output is:
+```{r oj_vc_half, echo=FALSE}
+doseoj.5 <- data %>% filter(supp == "OJ" & dose == .5) %>% select(len)
+dosevc.5 <- data %>% filter(supp == "VC" & dose == .5) %>% select(len)
+oj_vc_half <- t.test(doseoj.5, dosevc.5, paired = F, var.equal = T)
+oj_vc_half
+```
+With a $p$-value of `r I(oj_vc_half$p.value)` and a $t$-confidence interval of `r oj_vc_half$conf[1]` to `r oj_vc_half$conf[2]` (i.e. not containing 0) it seems reasonable to reject the null hypothesis, i.e. at low doses there appears to be a statistically significant difference between the two supplements.
+
+##### Comparing Orange Juice to Ascorbic Acid at 1.0mg
+The Student's $t$-test output is:
+```{r oj_vc_1, echo=FALSE}
+doseoj1 <- data %>% filter(supp == "OJ" & dose == 1.0) %>% select(len)
+dosevc1 <- data %>% filter(supp == "VC" & dose == 1.0) %>% select(len)
+oj_vc_1 <- t.test(doseoj1, dosevc1, paired = F, var.equal = T)
+oj_vc_1
+```
+With a $p$-value of `r I(oj_vc_1$p.value)` and a $t$-confidence interval of `r oj_vc_1$conf[1]` to `r oj_vc_1$conf[2]` (i.e. not containing 0) it seems reasonable to reject the null hypothesis, i.e. at medium doses there appears to be a statistically significant difference between the two supplements.
+
+
+##### Comparing Orange Juice to Ascorbic Acid at 2.0mg
+The Student's $t$-test output is:
+```{r oj_vc_2, echo=FALSE}
+doseoj2 <- data %>% filter(supp == "OJ" & dose == 2.0) %>% select(len)
+dosevc2 <- data %>% filter(supp == "VC" & dose == 2.0) %>% select(len)
+oj_vc_2 <- t.test(doseoj2, dosevc2, paired = F, var.equal = T)
+oj_vc_2
+```
+With a $p$-value of `r I(oj_vc_2$p.value)` and a $t$-confidence interval of `r oj_vc_2$conf[1]` to `r oj_vc_2$conf[2]` (i.e. *containing* 0) it seems reasonable to *fail* to reject the null hypothesis, i.e. at higher doses there does not appear to be a statistically significant difference between the two supplements.
+
+*******************************************************************************
+### Assumptions
+
+All the Student's $t$-tests in this exercise have been conducted assuming equal variances. As all subjects were guinea pigs, it was assumed that the population was simply *all guinea pigs* and so the *population* variance in tooth size would be equal in each subject group.
+
+Additionally, in order to perform a Students $t$-test, it is assumed that the data are normally distributed. With a sample of only `r nrow(data)` guinea pigs, this is a reasonable assumption to make. However it is imporant to **test this assumption**. This is done by plotting a density distribution of the sample, and overlaying a normal distribution curve:
+
+```{r assumption_test, echo=FALSE}
+data %>%
+  ggplot(aes(x = len))+
+  geom_density(fill = "gray10", alpha = 0.3, color= "white")+
+  theme_minimal()+
+  xlab("Tooth Length")+
+  ylab("Density")+
+  ggtitle("Density Plot of Tooth Size")+
+  theme(panel.grid.minor.y=element_blank(),
+        panel.grid.major.x=element_blank(),
+        panel.grid.minor.x=element_blank())+
+  stat_function(color="darkorange",
+                fun= dnorm, 
+                args = list(mean = mean(data$len), sd = sd(data$len)))
+```
+
+Whilst this plot shows that it is the case that the data deviate *slightly* from the truly normal distribution with a small negative skew, it seems reasonable to maintain this assumption as the deviation is very small.
+
+*******************************************************************************
+### Conclusions
+
+Overall, it is possible to conclude that there is a statistically significant difference between both orange juice and ascorbic acid, and the dosage at which these supplements are applied.
+
+Generally speaking a higher dosage results in a larger tooth growth and similarly orange juice results in a larger growth than pure ascorbic acid. 
+
+However, whilst this is true intra-supplement and medium and low does, at high doses, the two suppliments appear to produce approximately the same growth, with no statistically significant difference between the two.
+
+*******************************************************************************
+### References and Contact
+
+A number of packages were used and are therefore required for this analysis. These packages were:
+
+* [magrittr](http://cran.r-project.org/web/packages/magrittr/vignettes/magrittr.html)
+* [ggplot2](http://ggplot2.org/)
+* [dplyr](http://blog.rstudio.org/2014/01/17/introducing-dplyr/)
+
+The complete code and documentation for this assignment can be found on [GitHub](https://github.com/Jim89/stat_infer) repository. 
+
+The author of this report can be contacted on [twitter](https://twitter.com/leach_jim) 
+
+********************************************************************************
+
+### Appendix 1 - Complete R Code
+
+    ################################################################################
+    # Assignment 2 - Analysis of ToothGrowth data set
+    ################################################################################
+    # Load ToothGrowth data and perform basic exploratory analysis
+    # basic summary of data
+    # confidence intervals and hypothesis tests to compare growth by supp and dose
+    # state conclusions and assumptions
+    
+    ################################################################################
+    # Step 0  - load packages
+    ################################################################################
+    library(ggplot2,quietly=T)
+    library(magrittr,quietly=T)
+    library(dplyr,quietly=T)
+    
+    ################################################################################
+    # Step 1  - load data and perform some brief summaries
+    ################################################################################
+    data(ToothGrowth)
+    data <- ToothGrowth
+    
+    summary(data$len)
+    sd_len <- sd(data$len)
+    
+    ################################################################################
+    # Step 2  - explore based on suppliment
+    ################################################################################
+    # descriptive stats per suppliment
+    data_sum_sup <- data %>%
+      group_by(supp) %>%
+      summarise(mean_growth = mean(len),
+                sd_growth = sd(len),
+                lower_95 = mean_growth - qt(0.975, 29) * 
+                  (sd_growth/sqrt(30)),
+                upper_95 = mean_growth + qt(0.975, 29) * 
+                  (sd_growth/sqrt(30)),
+                ci = upper_95 - mean_growth)
+    
+    data_sum_sup$supp <- ifelse(data_sum_sup$supp == "OJ", "Orange Juice",
+                                "Ascorbic Acid")
+    
+    data_sum_sup %>%
+    ggplot(aes(x = supp, y = mean_growth), colour = supp)+
+      geom_bar(stat = "identity", aes(fill = supp))+
+      geom_errorbar(aes(ymin=mean_growth-ci, ymax=mean_growth+ci),
+                    width=.2,                    # Width of the error bars
+                    position=position_dodge(.9))+
+      scale_fill_manual(values = c("darkorange4", "darkorange"))+
+      theme_minimal()+
+      theme(legend.position = "none")+
+      ylab("Mean tooth length")+
+      ggtitle("Mean tooth length by suppliment administered")+
+      xlab("")
+    
+    ################################################################################
+    # Step 3  - explore based on dose
+    ################################################################################
+    # average length per dose per suppliment
+    data_sum_dose <- data %>%
+      group_by(dose) %>%
+      summarise(mean_growth = mean(len),
+                sd_growth = sd(len),
+                lower_95 = mean_growth - qt(0.975, 29) * 
+                  (sd_growth/sqrt(30)),
+                upper_95 = mean_growth + qt(0.975, 29) * 
+                  (sd_growth/sqrt(30)),
+                ci = upper_95 - mean_growth)
+    
+    data_sum_dose %>%
+      ggplot(aes(x = as.character(dose), y = mean_growth), colour = dose)+
+      geom_bar(stat = "identity", aes(fill = as.character(dose)))+
+      geom_errorbar(aes(ymin=mean_growth-ci, ymax=mean_growth+ci),
+                    width=.2,                    # Width of the error bars
+                    position=position_dodge(.9))+
+      scale_fill_manual(values = c("gray34","gray22","gray10"))+
+      xlab("Dosage (mg)")+
+      ylab("Mean tooth length")+
+      theme_minimal()+
+      theme(legend.position = "none")
+    
+    ################################################################################
+    # Step 4  - explore based on suppliment *and* dose
+    ################################################################################
+    # average length per dose per suppliment
+    data_sum_both <- data %>%
+      group_by(supp, dose) %>%
+      summarise(mean_growth = mean(len),
+                sd_growth = sd(len),
+                lower_95 = mean_growth - qt(0.975, 29) * 
+                  (sd_growth/sqrt(30)),
+                upper_95 = mean_growth + qt(0.975, 29) * 
+                  (sd_growth/sqrt(30)),
+                ci = upper_95 - mean_growth)
+    
+    data_sum_both$supp <- ifelse(data_sum_both$supp == "OJ", "Orange Juice",
+                                 "Ascorbic Acid")
+    
+    data_sum_both %>%
+      ggplot(aes(x = as.character(dose), y = mean_growth), colour = dose)+
+      geom_bar(stat = "identity", aes(fill = as.character(dose)))+
+      facet_grid(.~supp)+
+      scale_fill_manual(values = c("gray34","gray22","gray10"))+
+      xlab("Dosage (mg)")+
+      ylab("Mean tooth length")+
+      ggtitle("Mean tooth length by dose (mg) administered")+
+      theme_minimal()+
+      theme(legend.position = "none")
+    
+    ################################################################################
+    # Step 5  - hypothesis testing based on suppliment
+    ################################################################################
+    # lets test that with a t.test:
+    # hypothesis - orange juice provides a higher growth
+    oj <- data %>% filter(supp == "OJ") %>% select(len)
+    vc <- data %>% filter(supp == "VC") %>% select(len)
+    
+    t.test(oj, vc, alternative = "greater", paired = FALSE, var.equal = TRUE)
+    
+    ################################################################################
+    # Step 6  - hypothesis testing based on dose
+    ################################################################################
+    # lets test that with a t.test:
+    # hypothesis - higher doses provides a higher growth
+    dose2 <- data %>% filter(dose == 2.0) %>% select(len)
+    dose1 <- data %>% filter(dose == 1.0) %>% select(len)
+    dose0.5 <- data %>% filter(dose == 0.5) %>% select(len)
+    
+    # perform test for 2 being greater than 0.5
+    t.test(dose2, dose0.5, alternative = "greater", paired = F, var.equal = T)
+    
+    # perform test for 2 being greater than 1
+    t.test(dose2, dose1, atlernative = "greater", paired = F, var.equal = T)
+    
+    # perform test for 1 being greater than 0.5
+    t.test(dose1, dose0.5, alternative = "greater", paired = F, var.equal = T)
+    
+    
+    ################################################################################
+    # Step 7  - hypothesis testing based on suppliment and dose
+    ################################################################################
+    doseoj2 <- data %>% filter(supp == "OJ" & dose == 2.0) %>% select(len)
+    dosevc2 <- data %>% filter(supp == "VC" & dose == 2.0) %>% select(len)
+    t.test(doseoj2, dosevc2, paired = F, var.equal = T)
+    
+    doseoj1 <- data %>% filter(supp == "OJ" & dose == 1.0) %>% select(len)
+    dosevc1 <- data %>% filter(supp == "VC" & dose == 1.0) %>% select(len)
+    t.test(doseoj1, dosevc1, paired = F, var.equal = T)
+    
+    doseoj.5 <- data %>% filter(supp == "OJ" & dose == .5) %>% select(len)
+    dosevc.5 <- data %>% filter(supp == "VC" & dose == .5) %>% select(len)
+    t.test(doseoj.5, dosevc.5, paired = F, var.equal = T)
+    
+    ################################################################################
+    # Step 8  - test assumptions - data normally distributed
+    ################################################################################
+    data %>%
+      ggplot(aes(x = len))+
+      geom_density(fill = "gray10", alpha = 0.3, color= "white")+
+      theme_minimal()+
+      xlab("Tooth Length")+
+      ylab("Density")+
+      ggtitle("Density Plot of Tooth Size")+
+      theme(panel.grid.minor.y=element_blank(),
+            panel.grid.major.x=element_blank(),
+            panel.grid.minor.x=element_blank())+
+      stat_function(color="darkorange",
+                    fun= dnorm, 
+                    args = list(mean = mean(data$len), sd = sd(data$len)))
+
+
+
+
