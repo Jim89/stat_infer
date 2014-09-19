@@ -153,7 +153,7 @@ data_sum_both <- data %>%
 data_sum_both$supp <- ifelse(data_sum_both$supp == "OJ", "Orange Juice",
                                                          "Ascorbic Acid")
 
-data_sum_both[,1:5]
+data_sum_both[,1:6]
 ```
 The data presented show the mean growth for doses of 2.0mg, 1.0mg and 0.5mg of the respective supplements as well as the standard deviation and the 95% confidence intervals for these values.
 
